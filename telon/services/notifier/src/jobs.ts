@@ -6,6 +6,7 @@ import { orderConfirmedEmail } from './templates.js';
 
 export type EmailJob =
   | { type: 'order-confirmed'; orderId: string }
+  | { type: 'ticket-access'; tenantId: string; to: string; code: string; url: string }
   | { type: 'test-email'; tenantId: string; to: string };
 
 async function loadTenant(tenantId: string) {
@@ -48,7 +49,7 @@ export async function sendOrderConfirmed(orderId: string, jobId?: string) {
     tickets.push({ id: ticket.id, label: ticket.seat_id ? `Butaca ${ticket.seat_id}` : `Pase ${ticket.pass_name}`, cid });
   }
 
-  const ticketsUrl = `${config.storefrontUrl}/t/${tenant.slug}/mis-entradas?pedido=${order.id}&email=${encodeURIComponent(order.buyer_email)}`;
+  const ticketsUrl = `${config.storefrontUrl}/t/${tenant.slug}/mis-entradas`;
   const email = orderConfirmedEmail({
     tenantName: tenant.name,
     orderId: order.id,
@@ -79,12 +80,24 @@ export async function sendTestEmail(tenantId: string, to: string, jobId?: string
   await logEmail(tenant.id, provider.name, to, subject, jobId);
 }
 
+export async function sendTicketAccess(tenantId: string, to: string, code: string, url: string, jobId?: string) {
+  const tenant = await loadTenant(tenantId);
+  const provider = providerFor(tenant.email_provider, tenant.email_config);
+  const subject = `Accede a tus entradas de ${tenant.name}`;
+  const text = `Tu código de validación es ${code}. Caduca en 15 minutos.\n\nTambién puedes acceder desde este enlace temporal: ${url}`;
+  const html = `<p>Tu código de validación es <strong>${code}</strong>.</p><p>Caduca en 15 minutos.</p><p><a href="${url}">Acceder a mis entradas</a></p>`;
+  await provider.send({ from: tenant.email_from, to, subject, text, html });
+  await logEmail(tenant.id, provider.name, to, subject, jobId);
+}
+
 export async function handle(job: EmailJob, jobId?: string) {
   switch (job.type) {
     case 'order-confirmed':
       return sendOrderConfirmed(job.orderId, jobId);
     case 'test-email':
       return sendTestEmail(job.tenantId, job.to, jobId);
+    case 'ticket-access':
+      return sendTicketAccess(job.tenantId, job.to, job.code, job.url, jobId);
     default:
       throw new Error(`trabajo de correo desconocido: ${JSON.stringify(job)}`);
   }

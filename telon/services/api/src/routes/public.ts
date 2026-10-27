@@ -1,7 +1,8 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { pool } from '../db.js';
 import { HttpError } from '../errors.js';
-import { createOrder, getBuyerOrder, payOrder, releaseExpiredHolds, type CartItem } from '../orders/service.js';
+import { createOrder, payOrder, releaseExpiredHolds, type CartItem } from '../orders/service.js';
+import { requestTicketAccess, getTicketsWithCode, getTicketsWithLink } from '../tickets/access.js';
 import { resolvePublicTenant } from '../tenants/resolve.js';
 
 async function tenantOf(req: FastifyRequest) {
@@ -92,8 +93,18 @@ export async function publicRoutes(app: FastifyInstance) {
     return payOrder(tenant.id, req.params.id, String(req.body?.card ?? ''));
   });
 
-  app.get<{ Params: { id: string }; Querystring: { email?: string } }>('/api/public/orders/:id', async (req) => {
+  app.post<{ Body: { email: string } }>('/api/public/tickets/access', async (req) => {
     const tenant = await tenantOf(req);
-    return getBuyerOrder(tenant.id, req.params.id, req.query.email ?? '');
+    return requestTicketAccess(tenant, String(req.body?.email ?? ''));
+  });
+
+  app.post<{ Body: { email: string; code: string } }>('/api/public/tickets/access/verify', async (req) => {
+    const tenant = await tenantOf(req);
+    return getTicketsWithCode(tenant.id, String(req.body?.email ?? ''), String(req.body?.code ?? ''));
+  });
+
+  app.post<{ Body: { token: string } }>('/api/public/tickets/access/link', async (req) => {
+    const tenant = await tenantOf(req);
+    return getTicketsWithLink(tenant.id, String(req.body?.token ?? ''));
   });
 }

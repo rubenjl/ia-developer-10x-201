@@ -4,6 +4,7 @@ import { config } from './config.js';
 
 export type EmailJob =
   | { type: 'order-confirmed'; orderId: string }
+  | { type: 'ticket-access'; tenantId: string; to: string; code: string; url: string }
   | { type: 'test-email'; tenantId: string; to: string };
 
 let queue: Queue | null = null;

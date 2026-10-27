@@ -146,23 +146,3 @@ export async function payOrder(tenantId: string, orderId: string, card: string) 
   return { id: orderId, status: 'paid', charge_id: result.id };
 }
 
-export async function getBuyerOrder(tenantId: string, orderId: string, email: string) {
-  const o = await pool.query(
-    `SELECT o.id, o.status, o.buyer_email, o.subtotal_cents, o.fee_cents, o.total_cents, o.paid_at,
-            e.id AS event_id, e.title AS event_title, e.venue, e.starts_at
-       FROM orders o JOIN events e ON e.id = o.event_id
-      WHERE o.id = $1 AND o.tenant_id = $2 AND o.buyer_email = $3`,
-    [orderId, tenantId, email.toLowerCase()],
-  );
-  const order = o.rows[0];
-  if (!order) throw new HttpError(404, 'no hay ningún pedido con ese número y ese email');
-  const t = await pool.query(
-    `SELECT t.id, t.kind, t.seat_id, t.status, t.price_cents, t.fee_cents,
-            CASE WHEN t.status = 'valid' THEN t.qr_token END AS qr_token,
-            pt.name AS pass_name
-       FROM tickets t LEFT JOIN pass_types pt ON pt.id = t.pass_type_id
-      WHERE t.order_id = $1 ORDER BY t.id`,
-    [orderId],
-  );
-  return { ...order, tickets: t.rows };
-}
