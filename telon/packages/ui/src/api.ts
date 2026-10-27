@@ -58,6 +58,8 @@ export interface BuyerOrder {
   tickets: OrderTicket[];
 }
 
+export type TicketAccessOrder = BuyerOrder;
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -92,8 +94,12 @@ export function createApi(tenant: TenantRef, base = '/api/public') {
       }),
     payOrder: (orderId: string, card: string) =>
       call<{ id: string; status: string }>(`/orders/${orderId}/pay`, { method: 'POST', body: JSON.stringify({ card }) }),
-    order: (orderId: string, email: string) =>
-      call<BuyerOrder>(`/orders/${orderId}?email=${encodeURIComponent(email)}`),
+    requestTicketAccess: (email: string) =>
+      call<{ message: string }>('/tickets/access', { method: 'POST', body: JSON.stringify({ email }) }),
+    verifyTicketAccess: (email: string, code: string) =>
+      call<{ orders: TicketAccessOrder[] }>('/tickets/access/verify', { method: 'POST', body: JSON.stringify({ email, code }) }),
+    ticketsFromLink: (token: string) =>
+      call<{ orders: TicketAccessOrder[] }>('/tickets/access/link', { method: 'POST', body: JSON.stringify({ token }) }),
   };
 }
 

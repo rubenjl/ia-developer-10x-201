@@ -28,7 +28,7 @@ export function Checkout() {
   }
 
   if (state.status === 'paid') {
-    const url = `${basePath}/mis-entradas?pedido=${state.orderId}&email=${encodeURIComponent(email)}`;
+    const url = `${basePath}/mis-entradas`;
     return (
       <div style={box} data-telon="checkout" role="status">
         <h3 style={{ marginTop: 0 }}>¡Listo! Pedido {state.orderId}</h3>

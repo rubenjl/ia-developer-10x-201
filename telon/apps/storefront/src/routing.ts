@@ -4,7 +4,7 @@ export type Route =
   | { page: 'portal' }
   | { page: 'home'; tenant: TenantRef; basePath: string }
   | { page: 'event'; tenant: TenantRef; basePath: string; eventId: string }
-  | { page: 'tickets'; tenant: TenantRef; basePath: string; orderId: string; email: string }
+  | { page: 'tickets'; tenant: TenantRef; basePath: string }
   | { page: 'not-found'; tenant: TenantRef; basePath: string };
 
 // Hosts que son de Telón y no de un promotor: aquí el promotor va en la ruta (/t/<slug>).
@@ -31,9 +31,6 @@ export function resolveRoute(loc: { hostname: string; pathname: string; search: 
   if (path === '/') return { page: 'home', tenant, basePath };
   const ev = path.match(/^\/e\/([A-Za-z0-9-]+)$/);
   if (ev) return { page: 'event', tenant, basePath, eventId: ev[1]! };
-  if (path === '/mis-entradas') {
-    const q = new URLSearchParams(loc.search);
-    return { page: 'tickets', tenant, basePath, orderId: q.get('pedido') ?? '', email: q.get('email') ?? '' };
-  }
+  if (path === '/mis-entradas') return { page: 'tickets', tenant, basePath };
   return { page: 'not-found', tenant, basePath };
 }

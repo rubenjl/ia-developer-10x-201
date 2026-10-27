@@ -53,38 +53,72 @@ export function EventPage({ tenant, basePath, eventId }: { tenant: TenantRef; ba
   );
 }
 
-export function MyTickets(props: { tenant: TenantRef; basePath: string; orderId: string; email: string }) {
+export function MyTickets(props: { tenant: TenantRef; basePath: string }) {
   const api = useMemo(() => createApi(props.tenant), [props.tenant]);
-  const [orderId, setOrderId] = useState(props.orderId);
-  const [email, setEmail] = useState(props.email);
-  const [state, setState] = useState<{ order?: BuyerOrder; error?: string }>({});
+  const [email, setEmail] = useState('');
+  const [code, setCode] = useState('');
+  const [step, setStep] = useState<'email' | 'code' | 'tickets'>('email');
+  const [orders, setOrders] = useState<BuyerOrder[]>([]);
+  const [error, setError] = useState<string>();
+  const [notice, setNotice] = useState<string>();
 
-  async function search(e?: FormEvent) {
+  async function requestCode(e: FormEvent) {
     e?.preventDefault();
     try {
-      setState({ order: await api.order(orderId.trim(), email.trim()) });
+      setError(undefined);
+      const result = await api.requestTicketAccess(email.trim());
+      setNotice(result.message);
+      setStep('code');
     } catch (err) {
-      setState({ error: (err as Error).message });
+      setError((err as Error).message);
+    }
+  }
+
+  async function verifyCode(e: FormEvent) {
+    e.preventDefault();
+    try {
+      setError(undefined);
+      const result = await api.verifyTicketAccess(email.trim(), code.trim());
+      setOrders(result.orders);
+      setStep('tickets');
+    } catch (err) {
+      setError((err as Error).message);
     }
   }
 
   useEffect(() => {
-    if (props.orderId && props.email) void search();
-  }, []);
+    const token = new URLSearchParams(location.hash.slice(1)).get('token');
+    if (!token) return;
+    history.replaceState(null, '', `${location.pathname}${location.search}`);
+    api.ticketsFromLink(token).then(
+      (result) => { setOrders(result.orders); setStep('tickets'); },
+      (err: Error) => setError(err.message),
+    );
+  }, [api]);
 
-  const o = state.order;
   return (
     <main style={shell}>
       <p><a href={props.basePath || '/'}>← Volver</a></p>
       <h1>Mis entradas</h1>
-      <form onSubmit={search} style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 24 }}>
-        <input aria-label="Número de pedido" placeholder="PED-2026-0107" value={orderId} onChange={(e) => setOrderId(e.target.value)} />
-        <input aria-label="Email" type="email" placeholder="tu@email" value={email} onChange={(e) => setEmail(e.target.value)} />
-        <button type="submit">Buscar</button>
-      </form>
-      {state.error && <p role="alert">{state.error}</p>}
-      {o && (
-        <section>
+      {step === 'email' && (
+        <form onSubmit={requestCode} style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 24 }}>
+          <input aria-label="Email" type="email" required placeholder="tu@email" value={email} onChange={(e) => setEmail(e.target.value)} />
+          <button type="submit">Enviar código</button>
+        </form>
+      )}
+      {step === 'code' && (
+        <form onSubmit={verifyCode} style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 24 }}>
+          <p>Introduce el código enviado a {email}.</p>
+          <input aria-label="Código de validación" inputMode="numeric" autoComplete="one-time-code" required maxLength={6} value={code} onChange={(e) => setCode(e.target.value)} />
+          <button type="submit">Ver mis entradas</button>
+          <button type="button" onClick={() => setStep('email')}>Cambiar correo</button>
+        </form>
+      )}
+      {notice && step === 'code' && <p role="status">{notice}</p>}
+      {error && <p role="alert">{error}</p>}
+      {step === 'tickets' && orders.length === 0 && <p>No hay entradas pagadas asociadas a este correo.</p>}
+      {step === 'tickets' && orders.map((o) => (
+        <section key={o.id}>
           <h2>{o.event_title}</h2>
           <p>{formatDate(o.starts_at)} · {o.venue}</p>
           <p>Pedido {o.id} · {ORDER_STATUS[o.status] ?? o.status} · {formatEuros(o.total_cents)} (gastos {formatEuros(o.fee_cents)})</p>
@@ -99,7 +133,7 @@ export function MyTickets(props: { tenant: TenantRef; basePath: string; orderId:
             })}
           </div>
         </section>
-      )}
+      ))}
     </main>
   );
 }
