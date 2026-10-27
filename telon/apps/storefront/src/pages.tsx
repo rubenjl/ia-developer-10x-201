@@ -1,6 +1,9 @@
 import { PageRenderer } from '@telon/page-runtime';
 import { createApi, formatDate, formatEuros, TelonProvider, TicketQR, type BuyerOrder, type EventInfo, type TenantRef } from '@telon/ui';
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { PlatformHome } from './components/templates/PlatformHome.js';
+import { TenantStorefront } from './components/templates/TenantStorefront.js';
+import './styles/storefront.css';
 
 const shell = { maxWidth: 880, margin: '0 auto', padding: 32 } as const;
 
@@ -22,45 +25,19 @@ export function Portal() {
     [],
   );
   const port = location.port ? `:${location.port}` : '';
-  return (
-    <main style={shell}>
-      <h1>Telón</h1>
-      <p>Tiendas de entradas de los promotores. Cada una se abre por su dominio o por su ruta.</p>
-      {error && <p role="alert">{error}</p>}
-      <ul>
-        {data?.map((t) => (
-          <li key={t.slug} style={{ marginBottom: 8 }}>
-            <strong>{t.name}</strong> — <a href={`/t/${t.slug}`}>/t/{t.slug}</a>
-            {t.domains.map((d) => (
-              <span key={d}> · <a href={`${location.protocol}//${d}${port}/`}>{d}</a></span>
-            ))}
-          </li>
-        ))}
-      </ul>
-    </main>
-  );
+  if (error) return <main className="storefront-state"><p className="storefront-state__eyebrow">No se pudo cargar</p><h1>Las salas no están disponibles ahora.</h1><p>{error}</p></main>;
+  if (!data) return <main className="storefront-state" aria-live="polite"><p className="storefront-state__eyebrow">Telón · Cartelera</p><h1>Buscando tu próxima función…</h1></main>;
+  document.title = 'Cartelera · Telón';
+  return <PlatformHome tenants={data} protocol={location.protocol} port={port} />;
 }
 
 export function TenantHome({ tenant, basePath }: { tenant: TenantRef; basePath: string }) {
   const api = useMemo(() => createApi(tenant), [tenant]);
   const { data, error } = useLoad(() => api.site(), [api]);
-  if (error) return <main style={shell}><h1>No encontrado</h1><p>{error}</p></main>;
-  if (!data) return <main style={shell}>Cargando…</main>;
+  if (error) return <main className="storefront-state"><p className="storefront-state__eyebrow">No se pudo cargar</p><h1>Esta función no está disponible ahora.</h1><p>{error}</p></main>;
+  if (!data) return <main className="storefront-state" aria-live="polite"><p className="storefront-state__eyebrow">Preparando la sala</p><h1>Cargando cartelera…</h1></main>;
   document.title = `Entradas · ${data.tenant.name}`;
-  return (
-    <main style={shell}>
-      <h1>{data.tenant.name}</h1>
-      <ul>
-        {data.events.map((e) => (
-          <li key={e.id} style={{ marginBottom: 12 }}>
-            <a href={`${basePath}/e/${e.id}`}><strong>{e.title}</strong></a>
-            <div>{formatDate(e.starts_at)} · {e.venue}</div>
-          </li>
-        ))}
-      </ul>
-      <p><a href={`${basePath}/mis-entradas`}>Ya tengo entradas</a></p>
-    </main>
-  );
+  return <TenantStorefront tenantName={data.tenant.name} events={data.events} basePath={basePath} />;
 }
 
 export function EventPage({ tenant, basePath, eventId }: { tenant: TenantRef; basePath: string; eventId: string }) {
