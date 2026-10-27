@@ -48,6 +48,8 @@ export interface BuyerOrder {
   id: string;
   status: string;
   buyer_email: string;
+  tenant_name: string;
+  tenant_slug: string;
   subtotal_cents: number;
   fee_cents: number;
   total_cents: number;
@@ -69,9 +71,10 @@ export class ApiError extends Error {
   }
 }
 
-export function createApi(tenant: TenantRef, base = '/api/public') {
-  const headers: Record<string, string> =
-    'slug' in tenant ? { 'x-telon-tenant-slug': tenant.slug } : { 'x-telon-host': tenant.host };
+export function createApi(tenant?: TenantRef, base = '/api/public') {
+  const headers: Record<string, string> = tenant
+    ? 'slug' in tenant ? { 'x-telon-tenant-slug': tenant.slug } : { 'x-telon-host': tenant.host }
+    : {};
 
   async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
     const res = await fetch(base + path, {

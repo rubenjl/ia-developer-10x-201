@@ -8,6 +8,7 @@ export function PlatformHeader() {
       <p className="store-header__tenant">El escenario está <strong>en todas partes</strong></p>
       <nav className="store-header__nav" aria-label="Navegación principal">
         <a href="#salas">Las salas</a>
+        <a href="/mis-entradas">Mis entradas</a>
         <ArrowLink href="#salas" className="store-header__tickets">Ver cartelera</ArrowLink>
       </nav>
     </header>

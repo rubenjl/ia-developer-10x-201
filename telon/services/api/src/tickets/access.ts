@@ -22,14 +22,16 @@ function normalizedEmail(email: string) {
   return value;
 }
 
-async function ordersForEmail(tenantId: string, email: string) {
+async function ordersForEmail(email: string) {
   const result = await pool.query(
     `SELECT o.id, o.status, o.buyer_email, o.subtotal_cents, o.fee_cents, o.total_cents, o.paid_at,
-            e.id AS event_id, e.title AS event_title, e.venue, e.starts_at
+            e.id AS event_id, e.title AS event_title, e.venue, e.starts_at,
+            t.slug AS tenant_slug, t.name AS tenant_name
        FROM orders o JOIN events e ON e.id = o.event_id
-      WHERE o.tenant_id = $1 AND o.buyer_email = $2 AND o.status = 'paid'
+       JOIN tenants t ON t.id = o.tenant_id
+      WHERE o.buyer_email = $1 AND o.status = 'paid'
       ORDER BY o.created_at DESC, o.id`,
-    [tenantId, email],
+    [email],
   );
 
   return Promise.all(result.rows.map(async (order) => {
@@ -45,65 +47,68 @@ async function ordersForEmail(tenantId: string, email: string) {
   }));
 }
 
-export async function requestTicketAccess(tenant: { id: string; slug: string }, emailInput: string) {
+export async function requestTicketAccess(emailInput: string) {
   const email = normalizedEmail(emailInput);
   const matchingOrder = await pool.query(
-    `SELECT 1 FROM orders WHERE tenant_id = $1 AND buyer_email = $2 AND status = 'paid' LIMIT 1`,
-    [tenant.id, email],
+    `SELECT o.tenant_id FROM orders o
+       WHERE o.buyer_email = $1 AND o.status = 'paid'
+       ORDER BY o.created_at DESC, o.id LIMIT 1`,
+    [email],
   );
 
-  if (matchingOrder.rowCount) {
+  const tenantId = matchingOrder.rows[0]?.tenant_id as string | undefined;
+  if (tenantId) {
     const code = randomInt(0, 1_000_000).toString().padStart(6, '0');
     const token = randomBytes(32).toString('base64url');
     await pool.query(
-      `INSERT INTO ticket_access (tenant_id, email, code_hash, token_hash, expires_at, attempts, code_used_at)
-       VALUES ($1, $2, $3, $4, now() + ($5 * interval '1 minute'), 0, NULL)
-       ON CONFLICT (tenant_id, email) DO UPDATE
+      `INSERT INTO global_ticket_access (email, code_hash, token_hash, expires_at, attempts, code_used_at)
+       VALUES ($1, $2, $3, now() + ($4 * interval '1 minute'), 0, NULL)
+       ON CONFLICT (email) DO UPDATE
          SET code_hash = EXCLUDED.code_hash, token_hash = EXCLUDED.token_hash,
              expires_at = EXCLUDED.expires_at, attempts = 0, code_used_at = NULL`,
-      [tenant.id, email, hash(code), hash(token), ACCESS_MINUTES],
+      [email, hash(code), hash(token), ACCESS_MINUTES],
     );
-    const url = `${config.storefrontUrl}/t/${tenant.slug}/mis-entradas#token=${token}`;
-    await enqueueEmail({ type: 'ticket-access', tenantId: tenant.id, to: email, code, url });
+    const url = `${config.storefrontUrl}/mis-entradas#token=${token}`;
+    await enqueueEmail({ type: 'ticket-access', tenantId, to: email, code, url });
   }
 
   return { message: 'Si el correo tiene entradas pagadas, recibirás un código y un enlace temporal.' };
 }
 
-export async function getTicketsWithCode(tenantId: string, emailInput: string, code: string) {
+export async function getTicketsWithCode(emailInput: string, code: string) {
   const email = normalizedEmail(emailInput);
   const challenge = await pool.query<{ code_hash: string }>(
-    `SELECT code_hash FROM ticket_access
-      WHERE tenant_id = $1 AND email = $2 AND expires_at > now()
-        AND attempts < $3 AND code_used_at IS NULL`,
-    [tenantId, email, MAX_CODE_ATTEMPTS],
+    `SELECT code_hash FROM global_ticket_access
+      WHERE email = $1 AND expires_at > now()
+        AND attempts < $2 AND code_used_at IS NULL`,
+    [email, MAX_CODE_ATTEMPTS],
   );
   const valid = /^\d{6}$/.test(code) && challenge.rows[0] && equalHash(challenge.rows[0].code_hash, hash(code));
   if (!valid) {
     await pool.query(
-      `UPDATE ticket_access SET attempts = attempts + 1
-        WHERE tenant_id = $1 AND email = $2 AND expires_at > now() AND attempts < $3 AND code_used_at IS NULL`,
-      [tenantId, email, MAX_CODE_ATTEMPTS],
+      `UPDATE global_ticket_access SET attempts = attempts + 1
+        WHERE email = $1 AND expires_at > now() AND attempts < $2 AND code_used_at IS NULL`,
+      [email, MAX_CODE_ATTEMPTS],
     );
     throw new HttpError(401, 'el código no es válido o ha caducado');
   }
 
   const consumed = await pool.query(
-    `UPDATE ticket_access SET code_used_at = now()
-      WHERE tenant_id = $1 AND email = $2 AND expires_at > now()
-        AND attempts < $3 AND code_used_at IS NULL RETURNING email`,
-    [tenantId, email, MAX_CODE_ATTEMPTS],
+    `UPDATE global_ticket_access SET code_used_at = now()
+      WHERE email = $1 AND expires_at > now()
+        AND attempts < $2 AND code_used_at IS NULL RETURNING email`,
+    [email, MAX_CODE_ATTEMPTS],
   );
   if (!consumed.rowCount) throw new HttpError(401, 'el código no es válido o ha caducado');
-  return { orders: await ordersForEmail(tenantId, email) };
+  return { orders: await ordersForEmail(email) };
 }
 
-export async function getTicketsWithLink(tenantId: string, token: string) {
+export async function getTicketsWithLink(token: string) {
   const access = await pool.query<{ email: string }>(
-    `SELECT email FROM ticket_access
-      WHERE tenant_id = $1 AND token_hash = $2 AND expires_at > now()`,
-    [tenantId, hash(token)],
+    `SELECT email FROM global_ticket_access
+      WHERE token_hash = $1 AND expires_at > now()`,
+    [hash(token)],
   );
   if (!access.rows[0]) throw new HttpError(401, 'el enlace no es válido o ha caducado');
-  return { orders: await ordersForEmail(tenantId, access.rows[0].email) };
+  return { orders: await ordersForEmail(access.rows[0].email) };
 }

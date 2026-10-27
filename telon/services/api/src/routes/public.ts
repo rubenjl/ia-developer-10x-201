@@ -94,17 +94,14 @@ export async function publicRoutes(app: FastifyInstance) {
   });
 
   app.post<{ Body: { email: string } }>('/api/public/tickets/access', async (req) => {
-    const tenant = await tenantOf(req);
-    return requestTicketAccess(tenant, String(req.body?.email ?? ''));
+    return requestTicketAccess(String(req.body?.email ?? ''));
   });
 
   app.post<{ Body: { email: string; code: string } }>('/api/public/tickets/access/verify', async (req) => {
-    const tenant = await tenantOf(req);
-    return getTicketsWithCode(tenant.id, String(req.body?.email ?? ''), String(req.body?.code ?? ''));
+    return getTicketsWithCode(String(req.body?.email ?? ''), String(req.body?.code ?? ''));
   });
 
   app.post<{ Body: { token: string } }>('/api/public/tickets/access/link', async (req) => {
-    const tenant = await tenantOf(req);
-    return getTicketsWithLink(tenant.id, String(req.body?.token ?? ''));
+    return getTicketsWithLink(String(req.body?.token ?? ''));
   });
 }

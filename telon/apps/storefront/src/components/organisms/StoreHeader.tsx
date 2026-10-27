@@ -9,6 +9,10 @@ function platformHomeHref() {
   return '/';
 }
 
+function platformTicketsHref() {
+  return `${platformHomeHref().replace(/\/$/, '')}/mis-entradas`;
+}
+
 export function StoreHeader({ tenantName, basePath }: { tenantName: string; basePath: string }) {
   return (
     <header className="store-header">
@@ -17,7 +21,7 @@ export function StoreHeader({ tenantName, basePath }: { tenantName: string; base
       <nav className="store-header__nav" aria-label="Navegación principal">
         <a href={basePath || '/'}>Cartelera</a>
         <a href={platformHomeHref()}>Salas</a>
-        <ArrowLink href={`${basePath}/mis-entradas`} className="store-header__tickets">Mis entradas</ArrowLink>
+        <ArrowLink href={platformTicketsHref()} className="store-header__tickets">Mis entradas</ArrowLink>
       </nav>
     </header>
   );

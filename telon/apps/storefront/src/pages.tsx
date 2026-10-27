@@ -53,7 +53,7 @@ export function EventPage({ tenant, basePath, eventId }: { tenant: TenantRef; ba
   );
 }
 
-export function MyTickets(props: { tenant: TenantRef; basePath: string }) {
+export function MyTickets(props: { tenant?: TenantRef; basePath: string }) {
   const api = useMemo(() => createApi(props.tenant), [props.tenant]);
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
@@ -120,6 +120,7 @@ export function MyTickets(props: { tenant: TenantRef; basePath: string }) {
       {step === 'tickets' && orders.map((o) => (
         <section key={o.id}>
           <h2>{o.event_title}</h2>
+          <p>{o.tenant_name}</p>
           <p>{formatDate(o.starts_at)} · {o.venue}</p>
           <p>Pedido {o.id} · {ORDER_STATUS[o.status] ?? o.status} · {formatEuros(o.total_cents)} (gastos {formatEuros(o.fee_cents)})</p>
           <div>

@@ -2,6 +2,7 @@ import QRCode from 'qrcode';
 import { config } from './config.js';
 import { pool } from './db.js';
 import { providerFor } from './providers/index.js';
+import { smtpProvider } from './providers/smtp.js';
 import { orderConfirmedEmail } from './templates.js';
 
 export type EmailJob =
@@ -49,7 +50,7 @@ export async function sendOrderConfirmed(orderId: string, jobId?: string) {
     tickets.push({ id: ticket.id, label: ticket.seat_id ? `Butaca ${ticket.seat_id}` : `Pase ${ticket.pass_name}`, cid });
   }
 
-  const ticketsUrl = `${config.storefrontUrl}/t/${tenant.slug}/mis-entradas`;
+  const ticketsUrl = `${config.storefrontUrl}/mis-entradas`;
   const email = orderConfirmedEmail({
     tenantName: tenant.name,
     orderId: order.id,
@@ -82,11 +83,11 @@ export async function sendTestEmail(tenantId: string, to: string, jobId?: string
 
 export async function sendTicketAccess(tenantId: string, to: string, code: string, url: string, jobId?: string) {
   const tenant = await loadTenant(tenantId);
-  const provider = providerFor(tenant.email_provider, tenant.email_config);
-  const subject = `Accede a tus entradas de ${tenant.name}`;
+  const provider = smtpProvider({});
+  const subject = 'Accede a tus entradas de Telón';
   const text = `Tu código de validación es ${code}. Caduca en 15 minutos.\n\nTambién puedes acceder desde este enlace temporal: ${url}`;
   const html = `<p>Tu código de validación es <strong>${code}</strong>.</p><p>Caduca en 15 minutos.</p><p><a href="${url}">Acceder a mis entradas</a></p>`;
-  await provider.send({ from: tenant.email_from, to, subject, text, html });
+  await provider.send({ from: config.ticketsEmailFrom, to, subject, text, html });
   await logEmail(tenant.id, provider.name, to, subject, jobId);
 }
 

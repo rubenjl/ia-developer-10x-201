@@ -13,5 +13,6 @@ export const config = {
   redisUrl: process.env.REDIS_URL ?? 'redis://localhost:6379',
   smtpHost: process.env.SMTP_HOST ?? 'localhost',
   smtpPort: Number(process.env.SMTP_PORT ?? 1025),
+  ticketsEmailFrom: process.env.TICKETS_EMAIL_FROM ?? 'entradas@telon.test',
   storefrontUrl: storefrontUrl(),
 };

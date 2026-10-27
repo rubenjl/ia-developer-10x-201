@@ -5,7 +5,7 @@ import { accent, box, button, input, muted } from './styles.js';
 
 /** Datos del comprador y pago (pasarela emulada). */
 export function Checkout() {
-  const { api, event, basePath, markSold } = useTelon();
+  const { api, event, markSold } = useTelon();
   const cart = useCart();
   const [email, setEmail] = useState('');
   const [card, setCard] = useState('4242 4242 4242 4242');
@@ -28,7 +28,7 @@ export function Checkout() {
   }
 
   if (state.status === 'paid') {
-    const url = `${basePath}/mis-entradas`;
+    const url = '/mis-entradas';
     return (
       <div style={box} data-telon="checkout" role="status">
         <h3 style={{ marginTop: 0 }}>¡Listo! Pedido {state.orderId}</h3>
